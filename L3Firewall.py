@@ -30,6 +30,7 @@ class Firewall(EventMixin):
         self.disbaled_MAC_pair = []  # Shore a tuple of MAC pair which will be installed into the flow table of each switch.
         self.fwconfig = list()
 
+        #CSE548-Umapathy Ravichandiran
         # New data structure for tracking source MAC to multiple source IP mapping
         self.source_mac_to_ips = defaultdict(set)
         id_counter = 1  # Initialize the id counter
@@ -55,12 +56,11 @@ class Firewall(EventMixin):
                     mac_1 = EthAddr(line['mac_1'])
                 else:
                     mac_1 = None
-                # Append to the array storing all MAC pair.
+                
+                #CSE548-Umapathy Ravichandiran
                 # Append to the array storing all MAC pair if it's not already present
                 if (mac_0, mac_1) not in self.disbaled_MAC_pair:
-                    #self.disbaled_MAC_pair.append((mac_0, mac_1))
                     self.disbaled_MAC_pair.append((id_counter, mac_0, mac_1))
-                #self.disbaled_MAC_pair.append((mac_0, mac_1))
 
         with open(l3config) as csvfile:
             log.debug("Reading log file !")
@@ -100,7 +100,6 @@ class Firewall(EventMixin):
     def installFlow(self, event, offset, srcmac, dstmac, srcip, dstip, sport, dport, nwproto):
         
         if srcmac is not None:
-            print "Source MAC", srcmac
             # Check if the source MAC is in l2firewall.config, if so, block the traffic
             with open(l2config, 'rb') as rules:
                 csvreader = csv.DictReader(rules)
@@ -210,12 +209,12 @@ class Firewall(EventMixin):
             if ip_packet.protocol == ip_packet.TCP_PROTOCOL:
                 log.debug("TCP it is !")
 
+            #CSE548-Umapathy Ravichandiran
+
             src_mac_str = str(match.dl_src)
             src_ip = str(ip_packet.srcip)
             print "Source MAC", src_mac_str
-            print "Source IP", src_ip
-            #print "Source mac to IPs", source_mac_to_ips
-            
+            print "Source IP", src_ip            
 
             id_counter = 1
 
@@ -224,34 +223,17 @@ class Firewall(EventMixin):
                 self.source_mac_to_ips[src_mac_str] = set()
 
             # Check if this source MAC has multiple source IPs
-            #if src_mac_str in self.source_mac_to_ips:
-            #    print("entering 1st loop")
-            #print(source_mac_to_ips[src_mac_str])
+
             if src_ip not in self.source_mac_to_ips[src_mac_str]:
                 print "Detected multiple source IPs for", src_mac_str
-                #self.source_mac_to_ips[src_mac_str].add(src_ip)
                 self.source_mac_to_ips[src_mac_str].add(src_ip)
-                #print(source_mac_to_ips[src_mac_str])
                 # Add the source MAC to l2firewall.config for blocking if it's not already present
                 mac_entry = "{}\n".format(src_mac_str)
                 if mac_entry not in open(l2config).read():
                     with open(l2config, 'a') as l2config_file:
-                        #config = "{},{}".format(id_counter, mac_entry)
-                        #conf = config + ",any"
-                        #conf = "{},{},any".format(id_counter, mac_entry)
                         conf = "{},{},{}".format(id_counter, mac_entry, "any")
-                        #config = "{},{}".format(id_counter,mac_entry)
-                        #conf = config + ",any"
                         l2config_file.write(conf)
-                        #l2config_file.write(mac_entry)
                     id_counter += 1  # Increment the id counter
-                # Add the source MAC to l2firewall.config for blocking
-                #with open(l2config, 'a') as l2config_file:
-                    #print("writing to l2firewall")
-                    # Add the source MAC to l2firewall.config for blocking if it's not already present
-                    #l2config_file.write("{}\n".format(src_mac_str))
-                    #l2config_file.write(f"{src_mac_str}\n")
-                    #print("updated l2firewall")
 
                 # Install a flow rule to block traffic from the new source MAC
                 self.installFlow(event, priority, None, EthAddr(src_mac_str), None, None, None, None, None)
